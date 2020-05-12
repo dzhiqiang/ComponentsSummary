@@ -1,0 +1,132 @@
+1：ZooKeeper是什么？
+ZooKeeper 是一个分布式的，开放源码的分布式应用程序协调服务。它是一个为分布式应用提供一致性服务的软件，提供的功能包括：配置维护、域名服务、分布式同步、组服务等。
+2：Zookeeper保证了如下分布式一致性特性：
+顺序一致性
+原子性
+单一视图
+可靠性
+实时性（最终一致性）
+3：谈下你对 ZAB 协议的了解？
+ZAB协议是为分布式协调服务Zookeeper专门设计的一种支持崩溃恢复的原子广播协议。
+ZAB协议包括两种基本的模式：崩溃恢复和消息广播。
+当整个zookeeper集群1)刚刚启动或者2)Leader服务器宕机、重启或者3网络故障导致不存在过半的服务器与Leader服务器保持正常通信时，所有进程（服务器）进入崩溃恢复模式，首先选举产生新的Leader服务器，然后集群中Follower服务器开始与新的Leader服务器进行数据同步，当集群中超过半数机器与该Leader服务器完成数据同步之后，退出恢复模式进入消息广播模式，Leader服务器开始接收客户端的事务请求生成事物提案来进行事务请求处理。
+4：四种类型的数据节点 Znode
+PERSISTENT-持久节点除非手动删除，否则节点一直存在于Zookeeper上
+EPHEMERAL-临时节点临时节点的生命周期与客户端会话绑定，一旦客户端会话失效（客户端与zookeeper连接断开不一定会话失效），那么这个客户端创建的所有临时节点都会被移除。
+PERSISTENT_SEQUENTIAL-持久顺序节点基本特性同持久节点，只是增加了顺序属性，节点名后边会追加一个由父节点维护的自增整型数字。
+EPHEMERAL_SEQUENTIAL-临时顺序节点基本特性同临时节点，增加了顺序属性，节点名后边会追加一个由父节点维护的自增整型数字。
+5:zookeeper Watcher 机制 -- 数据变更通知
+Zookeeper允许客户端向服务端的某个Znode注册一个Watcher监听，当服务端的一些指定事件触发了这个Watcher，服务端会向指定客户端发送一个事件通知来实现分布式的通知功能，然后客户端根据Watcher通知状态和事件类型做出业务上的改变。
+Watcher特性总结：
+1）一次性
+无论是服务端还是客户端，一旦一个Watcher被触发，Zookeeper都会将其从相应的存储中移除。这样的设计有效的减轻了服务端的压力，不然对于更新非常频繁的节点，服务端会不断的向客户端发送事件通知，无论对于网络还是服务端的压力都非常大。
+2）客户端串行执行
+客户端Watcher回调的过程是一个串行同步的过程。
+3）轻量
+Watcher通知非常简单，只会告诉客户端发生了事件，而不会说明事件的具体内容。
+客户端向服务端注册Watcher的时候，并不会把客户端真实的Watcher对象实体传递到服务端，仅仅是在客户端请求中使用boolean类型属性进行了标记。
+6：客户端注册Watcher实现
+调用getData()/getChildren()/exist()三个API，传入Watcher对象
+标记请求request，封装Watcher到WatchRegistration
+封装成Packet对象，发服务端发送request
+收到服务端响应后，将Watcher注册到ZKWatcherManager中进行管理
+请求返回，完成注册。
+7：服务端处理Watcher实现
+服务端接收Watcher并存储：接收到客户端请求，处理请求判断是否需要注册Watcher，需要的话将数据节点的节点路径和ServerCnxn（ServerCnxn代表一个客户端和服务端的连接，实现了Watcher的process接口，此时可以看成一个Watcher对象）存储在WatcherManager的WatchTable和watch2Paths中去。
+Watcher触发：以服务端接收到 setData() 事务请求触发NodeDataChanged事件为例：
+1）封装WatchedEvent：将通知状态（SyncConnected）、事件类型（NodeDataChanged）以及节点路径封装成一个WatchedEvent对象
+2）查询Watcher：从WatchTable中根据节点路径查找Watcher，没找到；说明没有客户端在该数据节点上注册过Watcher
+　　找到；提取并从WatchTable和Watch2Paths中删除对应Watcher（从这里可以看出Watcher在服务端是一次性的，触发一次就失效了）
+3）调用process方法来触发Watcher
+4）这里process主要就是通过ServerCnxn对应的TCP连接发送Watcher事件通知。
+8：客户端回调Watcher
+客户端SendThread线程接收事件通知，交由EventThread线程回调Watcher。客户端的Watcher机制同样是一次性的，一旦被触发后，该Watcher就失效了。
+9：服务器角色
+Leader：事务请求的唯一调度和处理者，保证集群事务处理的顺序性，集群内部各服务的调度者
+Follower:处理客户端的非事务请求，转发事务请求给Leader服务器,参与事务请求Proposal的投票,参与Leader选举投票
+Observer:3.3.0版本以后引入的一个服务器角色，在不影响集群事务处理能力的基础上提升集群的非事务处理能力,处理客户端的非事务请求，转发事务请求给Leader服务器,不参与任何形式的投票
+10:Zookeeper 下 Server工作状态
+服务器具有四种状态，分别是LOOKING、FOLLOWING、LEADING、OBSERVING。
+LOOKING:寻找Leader状态。当服务器处于该状态时，它会认为当前集群中没有Leader，因此需要进入Leader选举状态。
+FOLLOWING:跟随者状态。表明当前服务器角色是Follower。
+LEADING:领导者状态。表明当前服务器角色是Leader。
+OBSERVING:观察者状态。表明当前服务器角色是Observer。
+11:Leader 选举
+Leader选举是保证分布式数据一致性的关键所在。当Zookeeper集群中的一台服务器出现以下两种情况之一时，需要进入Leader选举。
+1)服务器初始化启动。
+2)服务器运行期间无法和Leader保持连接。
+QuorumCnxManager：网络I/O每台服务器在启动的过程中，会启动一个QuorumPeerManager，负责各台服务器之间的底层Leader选举过程中的网络通信。
+1）QuorumCnxManager内部维护了一系列的队列，用来保存接收到的、待发送的消息以及消息的发送器，除接收队列以外，其他队列都按照SID分组形成队列集合，如一个集群中除了自身还有3台机器，那么就会为这3台机器分别创建一个发送队列，互不干扰。
+recvQueue：消息接收队列，用于存放那些从其他服务器接收到的消息。
+queueSendMap：消息发送队列，用于保存那些待发送的消息，按照SID进行分组。
+senderWorkerMap：发送器集合，每个SenderWorker消息发送器，都对应一台远程Zookeeper服务器，负责消息的发送，也按照SID进行分组。
+lastMessageSent：最近发送过的消息，为每个SID保留最近发送过的一个消息。
+2）建立连接。为了能够相互投票，Zookeeper集群中的所有机器都需要两两建立起网络连接。QuorumCnxManager在启动时会创建一个ServerSocket来监听Leader选举的通信端口(默认为3888)。开启监听后，Zookeeper能够不断地接收到来自其他服务器的创建连接请求，在接收到其他服务器的TCP连接请求时，会进行处理。为了避免两台机器之间重复地创建TCP连接，Zookeeper只允许SID大的服务器主动和其他机器建立连接，否则断开连接。在接收到创建连接请求后，服务器通过对比自己和远程服务器的SID值来判断是否接收连接请求，如果当前服务器发现自己的SID更大，那么会断开当前连接，然后自己主动和远程服务器建立连接。一旦连接建立，就会根据远程服务器的SID来创建相应的消息发送器SendWorker和消息接收器RecvWorker，并启动。
+3）消息接收与发送。消息接收：由消息接收器RecvWorker负责，由于Zookeeper为每个远程服务器都分配一个单独的RecvWorker，因此，每个RecvWorker只需要不断地从这个TCP连接中读取消息，并将其保存到recvQueue队列中。消息发送：由于Zookeeper为每个远程服务器都分配一个单独的SendWorker，因此，每个SendWorker只需要不断地从对应的消息发送队列中获取出一个消息发送即可，同时将这个消息放入lastMessageSent中。在SendWorker中，一旦Zookeeper发现针对当前服务器的消息发送队列为空，那么此时需要从lastMessageSent中取出一个最近发送过的消息来进行再次发送，这是为了解决接收方在消息接收前或者接收到消息后服务器挂了，导致消息尚未被正确处理。同时，Zookeeper能够保证接收方在处理消息时，会对重复消息进行正确的处理。
+4）FastLeaderElection：选举算法核心
+外部投票：特指其他服务器发来的投票。内部投票：服务器自身当前的投票。选举轮次：Zookeeper服务器Leader选举的轮次，即logicalclock。PK：对内部投票和外部投票进行对比来确定是否需要变更内部投票。
+选票管理：sendqueue：选票发送队列，用于保存待发送的选票。recvqueue：选票接收队列，用于保存接收到的外部投票。WorkerReceiver：选票接收器。其会不断地从QuorumCnxManager中获取其他服务器发来的选举消息，并将其转换成一个选票，然后保存到recvqueue中，在选票接收过程中，如果发现该外部选票的选举轮次小于当前服务器的，那么忽略该外部投票，同时立即发送自己的内部投票。WorkerSender：选票发送器，不断地从sendqueue中获取待发送的选票，并将其传递到底层QuorumCnxManager中。
+5）核心算法
+①自增选举轮次。Zookeeper规定所有有效的投票都必须在同一轮次中，在开始新一轮投票时，会首先对logicalclock进行自增操作。
+②初始化选票。在开始进行新一轮投票之前，每个服务器都会初始化自身的选票，并且在初始化阶段，每台服务器都会将自己推举为Leader。
+③发送初始化选票。完成选票的初始化后，服务器就会发起第一次投票。Zookeeper会将刚刚初始化好的选票放入sendqueue中，由发送器WorkerSender负责发送出去。
+④接收外部投票。每台服务器会不断地从recvqueue队列中获取外部选票。如果服务器发现无法获取到任何外部投票，那么就会立即确认自己是否和集群中其他服务器保持着有效的连接，如果没有连接，则马上建立连接，如果已经建立了连接，则再次发送自己当前的内部投票。
+⑤判断选举轮次。在发送完初始化选票之后，接着开始处理外部投票。在处理外部投票时，会根据选举轮次来进行不同的处理。
+   1）外部投票的选举轮次大于内部投票。若服务器自身的选举轮次落后于该外部投票对应服务器的选举轮次，那么就会立即更新自己的选举轮次(logicalclock)，并且清空所有已经收到的投票，然后使用初始化的投票来进行PK以确定是否变更内部投票。最终再将内部投票发送出去。
+   2）外部投票的选举轮次小于内部投票。若服务器接收的外选票的选举轮次落后于自身的选举轮次，那么Zookeeper就会直接忽略该外部投票，不做任何处理，并返回步骤4。
+   3）外部投票的选举轮次等于内部投票。此时可以开始进行选票PK。
+⑥选票PK
+	若外部投票中推举的Leader服务器的选举轮次大于内部投票，那么需要变更投票。
+	若选举轮次一致，那么就对比两者的ZXID，若外部投票的ZXID大，那么需要变更投票。
+	若两者的ZXID一致，那么就对比两者的SID，若外部投票的SID大，那么就需要变更投票。
+⑦变更投票
+经过PK后，若确定了外部投票优于内部投票，那么就变更投票，即使用外部投票的选票信息来覆盖内部投票，变更完成后，再次将这个变更后的内部投票发送出去。
+⑧选票归档
+无论是否变更了投票，都会将刚刚收到的那份外部投票放入选票集合recvset中进行归档。recvset用于记录当前服务器在本轮次的Leader选举中收到的所有外部投票（按照服务器的SID区别，如{(1, vote1), (2, vote2)...}）。
+⑨统计投票
+完成选票归档后，就可以开始统计投票，统计投票是为了统计集群中是否已经有过半的服务器认可了当前的内部投票，如果确定已经有过半服务器认可了该投票，则终止投票。否则返回步骤4。
+圈10：更新服务器状态
+若已经确定可以终止投票，那么就开始更新服务器状态，服务器首选判断当前被过半服务器认可的投票所对应的Leader服务器是否是自己，若是自己，则将自己的服务器状态更新为LEADING，若不是，则根据具体情况来确定自己是FOLLOWING或是OBSERVING。
+以上10个步骤就是FastLeaderElection的核心，其中步骤4-9会经过几轮循环，直到有Leader选举产生。
+12: 数据同步
+整个集群完成Leader选举之后，Learner（Follower和Observer的统称）回向Leader服务器进行注册。当Learner服务器向Leader服务器完成注册后，进入数据同步环节。
+数据同步流程：
+Learner向Learder注册
+数据同步
+同步确认
+Zookeeper的数据同步通常分为四类：
+直接差异化同步（DIFF同步）
+先回滚再差异化同步（TRUNC+DIFF同步）
+仅回滚同步（TRUNC同步）
+全量同步（SNAP同步）
+在进行数据同步前，Leader服务器会完成数据同步初始化：
+peerLastZxid：从learner服务器注册时发送的ACKEPOCH消息中提取lastZxid（该Learner服务器最后处理的ZXID）
+minCommittedLog：Leader服务器Proposal缓存队列committedLog中最小ZXID
+maxCommittedLog：Leader服务器Proposal缓存队列committedLog中最大ZXID
+直接差异化同步（DIFF同步）
+场景：peerLastZxid介于minCommittedLog和maxCommittedLog之间
+先回滚再差异化同步（TRUNC+DIFF同步）
+场景：当新的Leader服务器发现某个Learner服务器包含了一条自己没有的事务记录，那么就需要让该Learner服务器进行事务回滚--回滚到Leader服务器上存在的，同时也是最接近于peerLastZxid的ZXID
+仅回滚同步（TRUNC同步）
+场景：peerLastZxid 大于 maxCommittedLog
+全量同步（SNAP同步）
+场景一：peerLastZxid 小于 minCommittedLog
+场景二：Leader服务器上没有Proposal缓存队列且peerLastZxid不等于lastProcessZxid
+13:zookeeper是如何保证事务的顺序一致性的？
+zookeeper采用了全局递增的事务Id来标识，所有的proposal（提议）都在被提出的时候加上了zxid，zxid实际上是一个64位的数字，高32位是epoch（时期; 纪元; 世; 新时代）用来标识leader周期，如果有新的leader产生出来，epoch会自增，低32位用来递增计数。当新产生proposal的时候，会依据数据库的两阶段过程，首先会向其他的server发出事务执行请求，如果超过半数的机器都能执行并且能够成功，那么就会开始执行。
+14:Zookeeper对节点的watch监听通知是永久的吗？为什么不是永久的?
+不是。官方声明：一个Watch事件是一个一次性的触发器，当被设置了Watch的数据发生了改变的时候，则服务器将这个改变发送给设置了Watch的客户端，以便通知它们。
+为什么不是永久的，举个例子，如果服务端变动频繁，而监听的客户端很多情况下，每次变动都要通知到所有的客户端，给网络和服务器造成很大压力。
+一般是客户端执行getData(“/节点A”,true)，如果节点A发生了变更或删除，客户端会得到它的watch事件，但是在之后节点A又发生了变更，而客户端又没有设置watch事件，就不再给客户端发送。
+在实际应用中，很多情况下，我们的客户端不需要知道服务端的每一次变动，我只要最新的数据即可。
+15:ZAB和Paxos算法的联系与区别？
+相同点：
+两者都存在一个类似于Leader进程的角色，由其负责协调多个Follower进程的运行
+Leader进程都会等待超过半数的Follower做出正确的反馈后，才会将一个提案进行提交
+ZAB协议中，每个Proposal中都包含一个 epoch 值来代表当前的Leader周期，Paxos中名字为Ballot
+不同点：
+ZAB用来构建高可用的分布式数据主备系统（Zookeeper），Paxos是用来构建分布式一致性状态机系统。
+16:zookeeper的顺序一致性
+
+
+
