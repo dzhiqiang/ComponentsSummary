@@ -1,0 +1,16 @@
+java锁
+ReentrantLock
+非公平锁：cas把state变为1，成功则执行
+		  不成功，则试图获取锁：
+			1）如果state=0,cas操作成功则返回true
+			2）如果不等于0，如果是当前线程则增加state的值
+			3）require(1) 创建一个Node(独占)，把tail线程的尾部Node替换成新加入的Node,也会关联起来
+			4) 等待的线程前面永远有一个正在执行的Head,当释放锁时判断head的状态，如果不等于0则唤醒下一个节点
+			5) 会把此线程进行等待
+			6）释放，减少state,查看head是否等于0，不等于的话就去释放下一个Node
+				
+			
+ReentrantLock与synchronize的区别：
+	1：api层面，ReentrantLock是api层面编写的，通过变量state的cas实现的，需要lock和unlock，synchronize 通过虚拟机字节码加monitor实现的，synchronized 可以修饰方法和代码块
+	2：ReentrantLock可以中断等待
+	3：ReentrantLock可以使用公平锁，因为每次lock都是状态的cas操作，在没获取的时候就会进入队列，进入队列的是公平的，如果正好有一个释放，那么进来的线程操作就可以cas成功，造成插队的情况，公平的话就会判断是否有排队的情况

@@ -1,0 +1,9 @@
+分布式系统：
+用大白话聊聊分布式系统：https://waylau.com/talk-about-distributed-system/
+集中式管理：所有的程序、功能都集中到一台主机上，从而往外提供服务的方式
+分布式管理：根据业务拆分多个系统，部署到不同的服务器，避免造成全部瘫痪的风险。而且还能横向扩展，集群式部署，保证分布式系统每一个服务的可用性。
+但是也面临一些问题，比如如何规划子系统间的通信，还好有各种开源的组件：Apache ActiveMQ、RabbitMQ、Apache RocketMQ、Apache Kafka等，也有类似与 Google Protocol Buffer、Thrift等 RPC框架。在设计分布式计算时，我们分布式计算可以采用 MapReduce、Apache Hadoop、Apache Spark 等。在大数据和分布式存储方面，我们可以选择 Apache HBase、Apache Cassandra、Memcached、Redis、MongoDB等。在分布式监控方面，常用的技术包括Nagios、Zabbix、Consul、ZooKeeper等。
+分布式部署的CAP理论：
+Consistency：一致性
+Availability：可用性
+Partition tolerance：分区容错
