@@ -44,3 +44,49 @@ InnoDB和myisam的区别
  3:表锁差异,只支持表级锁,行级锁
 InnoDB为什么用b+树
 
+
+
+Mysql底层线程：
+Master Thread线程：负责数据异步刷新到磁盘，保证数据的一致性，包括脏页的刷新，合并插入缓冲（insert buffer）undolog页的回收等
+IO Thread:负责IO请求的回调处理。
+Purge Thread:删除undolog日志
+Page Cleaner Thread:将之前版本的脏页的刷新
+
+内存：
+页的大小默认为16kb
+1：缓冲池：数据页类型有：索引页，数据页，undo页，插入缓冲（insert buffer）,自适应哈希索引，InnoDB存储的锁信息，数据字典信息等
+2: 缓冲池管理：LRU(Latest Recent Used)最近最少使用，优化处理，最近访问的页放入到midpoint位置（5/8位置）
+3：重做日志缓冲：先放入到缓冲池，已一定的频率刷新到重做日期文件。
+	刷新到文件条件
+	1）masterThread 每秒刷新一次
+	2）当事务提交的时候
+	3）当缓冲池大于1/2时。
+4：额外的内存池
+5：checkpoint技术
+为了防止数据丢失使用（write ahead log）策略，事务提交时先写重做日志，在修改页。
+checkpoint：1）缓冲池不够用时，讲脏页刷新到磁盘2）重做日志不可用时，刷新脏页
+通过LSN（8字节）标志版本：每个页中都有LSN，重做日志中也有LSN，checkpoint也有LSN.
+什么时候进行checkpoint:
+1)主线程每秒或者10秒，将一定比例的脏页刷新到数据库
+2)FLUSH_LRU_LIST Checkpint：通过检查LRU列表是否有足够的空间页来进行checkpoint的
+3）重做日期不可用的情况（重做日志比较大），强制刷新
+4）脏页太多，也会刷新，默认75%
+
+InnoDB特性：
+1：插入缓冲，满足2个条件：1）索引是辅助索引3）索引不是唯一的
+坏处：发生宕机时，部分insertbuffer并没有插入到对应的索引中，导致回复时间长
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
