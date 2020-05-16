@@ -34,6 +34,7 @@ Pipe：两个线程之间的单向数据连接，数据会被写到sink通道，
 NIO的服务端建立过程：Selector.open()：打开一个Selector；ServerSocketChannel.open()：创建服务端的Channel；bind()：绑定到某个端口上。并配置非阻塞模式；register()：注册Channel和关注的事件到Selector上；select()轮询拿到已经就绪的事件
 7：Netty的线程模型？
 netty通过Reactor模型基于多路复用模器接收并处理用户请求，内部实现了两个线程池，boss线程池和work线程池，其中boss线程池的线程池的线程负责处理请求的accept事件，当接收到accept事件的请求时，把对应的socket封装在一个NioSockChannel中，并交给work线程池，其中work线程池负责请求的read和write事件，由对应Handler处理
+8：
 
 
 
