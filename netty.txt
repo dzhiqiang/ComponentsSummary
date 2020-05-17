@@ -22,7 +22,7 @@ IO 线程模型：同步非阻塞，用最少的资源做更多的事。
 高性能序列化协议：支持 protobuf 等高性能序列化协议。
 6：NIO的组成？
 Buffer：与Channel进行交互，数据是从Channel读入缓冲区，从缓冲区写入Channel中的
-	flip方法 ： 反转此缓冲区，将position给limit，然后将position置为0，其实就是切换读写模式
+	flip方法 ： 反转此缓冲区，将position给limit，然后将position置为0，其实就是切换读写模式。
 	clear方法 ：清除此缓冲区，将position置为0，把capacity的值给limit。
 	rewind方法 ： 重绕此缓冲区，将position置为0
 DirectByteBuffer可减少一次系统空间到用户空间的拷贝。但Buffer创建和销毁的成本更高，不可控，通常会用内存池来提高性能。直接缓冲区主要分配给那些易受基础系统的本机I/O 操作影响的大型、持久的缓冲区。如果数据量比较小的中小应用情况下，可以考虑使用heapBuffer，由JVM进行管理。
@@ -42,8 +42,8 @@ netty通过Reactor模型基于多路复用模器接收并处理用户请求，�
 零拷贝：使用堆外直接内存进行Socket读写，不需要进行字节缓冲区的二次拷贝。传统的堆内存（HEAP BUFFERS）进行Socket读写，JVM会将堆内存Buffer拷贝一份到直接内存中，然后才写入到Socket中。相比于堆外直接内存，消息在发送过程中多了一次缓冲区的内存拷贝。
 10：netty中的零拷贝
 Netty 的接收和发送 ByteBuffer 采用 DIRECT BUFFERS，使用堆外直接内存进行 Socket 读写，不需要进行字节缓冲区的二次拷贝。如果使用传统的堆内存（HEAP BUFFERS）进行 Socket 读写，JVM 会将堆内存 Buffer 拷贝一份到直接内存中，然后才写入 Socket 中。相比于堆外直接内存，消息在发送过程中多了一次缓冲区的内存拷贝。
-Netty 的文件传输采用了 transferTo 方法，它可以直接将文件缓冲区的数据发送到目标 Channel，避免了传统通过循环 write 方式导致的内存拷贝问题。
-11：Netty 中有那种重要组件？
+Netty 的文件传输采用了 transferTo 方法，它可以直接将文件缓冲区的数据发送到目标Channel，避免了传统通过循环write方式导致的内存拷贝问题。
+11：Netty中有那种重要组件？
 Channel：Netty 网络操作抽象类，它除了包括基本的 I/O 操作，如 bind、connect、read、write 等。
 EventLoop：主要是配合 Channel 处理 I/O 操作，用来处理连接的生命周期中所发生的事情。
 ChannelFuture：Netty 框架中所有的 I/O 操作都为异步的，因此我们需要 ChannelFuture 的 addListener()注册一个 ChannelFutureListener 监听事件，当操作执行成功或者失败时，监听就会自动触发返回结果。
@@ -101,14 +101,3 @@ ChannelHandler本身并没有提供很多方法，因为这个接口有许多的
 ChannelPipline
 保存ChannelHandler的List，用于处理或拦截Channel的入站事件和出站操作。 ChannelPipeline实现了一种高级形式的拦截过滤器模式，使用户可以完全控制事件的处理方式，以及Channel中各个的ChannelHandler如何相互交互。
 一个 Channel 包含了一个 ChannelPipeline, 而 ChannelPipeline 中又维护了一个由 ChannelHandlerContext 组成的双向链表, 并且每个 ChannelHandlerContext 中又关联着一个 ChannelHandler。入站事件和出站事件在一个双向链表中，入站事件会从链表head往后传递到最后一个入站的handler，出站事件会从链表tail往前传递到最前一个出站的handler，两种类型的handler互不干扰。
-
-
-
-
-
-
-
-
-
-
-
