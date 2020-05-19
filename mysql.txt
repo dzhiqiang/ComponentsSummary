@@ -44,11 +44,22 @@ InnoDB和myisam的区别
  3:表锁差异,只支持表级锁,行级锁
 InnoDB为什么用b+树
 
+InnoDB回复过程
+https://www.jianshu.com/p/80c28fe4e2fe
+InnoDB的数据恢复是一个很复杂的过程，这个恢复过程需要redo log、binlog、undo log等参与。这里把InnoDB的恢复过程主要划分为两个阶段:
+第一阶段主要依赖于redo log的恢复；
+而第二阶段，恰恰需要binlog和undo log的共同参与。
+一、依赖redo log进行恢复
+第一阶段：数据库启动后，InnoDB会根据checkpoint找到最后一次checkpoint的LSN,然后根据LSN获取重做的日志，接着解析获取的日志并且保存到一个哈希表中，读取redolog日志，读取相关页的恢复。
+第二阶段：binlog和undo log共同参与
+	1）根据binlog获取所有可能没有提交事务的xid列表
+	2）根据undo中的信息构造所有未提交事务链表，最后通过上面两部分协调判断事务是否可以提交。
+
 
 
 Mysql底层线程：
 Master Thread线程：负责数据异步刷新到磁盘，保证数据的一致性，包括脏页的刷新，合并插入缓冲（insert buffer）undolog页的回收等
-IO Thread:负责IO请求的回调处理。
+IO Thread:负责IO请求的回调处理。主从同步。
 Purge Thread:删除undolog日志
 Page Cleaner Thread:将之前版本的脏页的刷新
 
@@ -56,7 +67,7 @@ Page Cleaner Thread:将之前版本的脏页的刷新
 页的大小默认为16kb
 1：缓冲池：数据页类型有：索引页，数据页，undo页，插入缓冲（insert buffer）,自适应哈希索引，InnoDB存储的锁信息，数据字典信息等
 2: 缓冲池管理：LRU(Latest Recent Used)最近最少使用，优化处理，最近访问的页放入到midpoint位置（5/8位置）
-3：重做日志缓冲：先放入到缓冲池，已一定的频率刷新到重做日期文件。
+3：重做日志缓冲：先放入到缓冲池，已一定的频率刷新到重做日志文件。
 	刷新到文件条件
 	1）masterThread 每秒刷新一次
 	2）当事务提交的时候
@@ -73,8 +84,56 @@ checkpoint：1）缓冲池不够用时，讲脏页刷新到磁盘2）重做日�
 4）脏页太多，也会刷新，默认75%
 
 InnoDB特性：
-1：插入缓冲，满足2个条件：1）索引是辅助索引3）索引不是唯一的
+1：插入缓冲，满足2个条件：1）索引是辅助索引2）索引不是唯一的
 坏处：发生宕机时，部分insertbuffer并没有插入到对应的索引中，导致回复时间长
+2：ChangeBuffer
+可以对insert ,delete,update进行缓冲，分别为insert buffer,delete buffer,purge buffer
+3:两次写（doublewrite）
+InnoDB存储引擎的是数据页的可靠性
+脏页不直接写入磁盘而是直接写入doublewritebuffer,写入buffer后在写入表共享空间，然后同步到磁盘。
+4：自适应哈希索引
+B+树的高度一般为3-4。需要3-4次查询。InnoDB自动判断如果能带来性能的提升则创建自适应哈希（AHI）,不会每个节点创建哈希，而是根据访问频率和模式自动为热点页建立
+创建条件：1）已该模式访问了100次2）页通过该模式访问了N次，其中N=页中记录*1/16
+5：异步IO
+Sql语句需要查询多个页，没必要等待其他页返回，可以直接请求读取其他页，而且还有进行IO merge操作，如果发现连续的页，那么会读取合并后页的大小
+6：刷新邻接页
+刷新脏页时，InnoDB存储引擎检测该页的所在区的所有页，如果是脏页则一起刷新。
+
+文件系统：
+1：日志文件：错误日志，二进制日志，慢查询日志，查询日志。
+主要看二进制日志（binary log）
+作用：
+恢复：某些数据的恢复需要二进制日志
+复制：通过复制和执行二进制日志使一台远程的mysql数据库与一台Mysql数据库进行实时同步
+审计：判断是否有对数据库的攻击
+当使用支持事务的数据库引擎时，所有未提交的二进制日志会被记录到一个缓存中取，等该事务提交时直接将缓冲的二进制文件写入二进制文件中。
+并不是每次写都会同步到磁盘
+如果sysc_binlog默认值为0，不会立即同步到磁盘，会有系统缓存，设置为1的话会立即写入磁盘。
+binlog_format:statement,row,mixed
+1)statement:记录日志的逻辑sql语句
+2）row:记录行更改的条件
+3）mixed模式：默认使用statement格式进行二进制文件存储，但在一些情况下会使用row
+	1)使用了UUID(),USER(),CURRENT_USER(),FOUND_ROWS()
+	2)使用了INSERT DELAY语句
+	3)使用了用户定义的函数
+	5)使用了临时表
+2:配置文件
+3：套接字文件
+4：pid文件
+5：表结构文件
+6：InnoDB存储引擎文件
+表空间文件：
+
+
+
+
+
+
+
+
+
+
+
 
 
 
