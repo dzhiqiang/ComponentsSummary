@@ -87,7 +87,20 @@ global-session： 全局session作用域，仅仅在基于portlet的web应用中
 	Spring初始化步骤：1）创建bean.2)赋值属性3）init方法初始化，循环依赖主要发生在1,2阶段
 	Spring循环依赖的三种情况：
 	1）构造器循环依赖，无法处理，抛出异常
+		this.singletonsCurrentlylnCreation.add(beanName）将正在创建的bean放入正在创建的池子中，如果依赖了此池子中的beanname则抛出异常，创建完之后会移除池子
 	2）单例模式下的set循环依赖
-		
+		spring使用的三级缓存解决循环依赖
+		/** 缓存单例对账: bean name –> bean instance */
+		private final Map singletonObjects = new ConcurrentHashMap(256);
+		/** 缓存工厂: bean name –> ObjectFactory */
+		private final Map> singletonFactories = new HashMap>(16);
+		/** 缓存较早的单例对账: bean name –> bean instance */
+		private final Map earlySingletonObjects = new HashMap(16);
+		----------------------------
+		singletonFactories:进入实例化阶段的单例对象工厂的cache(三级缓存），新建的对象会存入此对象，set的时候能够拿到
+		earlySingletonObjects ：完成实例化但是尚未初始化的，提前曝光的单例对象的cache(二级缓存)
+		singletonObjects：完成初始化的单例对象的cache（一级缓存）
+		获取对象时（调用getSingleton方法），先判断singletonObjects是否能够得到，如果得不到则从earlySingletonObjects获取，
+		如果获取不到的话singletonFactories获取，并放入到earlySingletonObjects，然后把获取到的bean从singletonFactories移除
 	3）非单例模式的循环依赖，无法处理，抛出异常
-
+		对于“prototype”作用域bean, Spring 容器无法完成依赖注入，因为Spring 容器不进行缓 存“prototype”作用域的bean ，因此无法提前暴露一个创建中的bean 。
