@@ -56,7 +56,16 @@ global-session： 全局session作用域，仅仅在基于portlet的web应用中
 8，SpringMVC处理过程
 	1）request请求url，DispatcherServlet接受用户的请求和响应
 	2）DispatcherServlet根据请求信息，找到对应的handler
-
+	
+9，Spring解决循环依赖
+	Spring初始化步骤：1）创建bean.2)赋值属性3）init方法初始化，循环依赖主要发生在1,2阶段
+	Spring循环依赖的三种情况：
+	1）构造器循环依赖，无法处理，抛出异常
+	2）单例模式下的set循环依赖
+		
+	3）非单例模式的循环依赖，无法处理，抛出异常
+	
+	
 
 
 
