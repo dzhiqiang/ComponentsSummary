@@ -144,7 +144,43 @@ binlog_format:statement,row,mixed
 		变长字段长度列表：非空的字段长度逆序存放，255以内是1个字节，255以外用2个字节。
 		NULL标志位：指示了改行数据中是否有NULL值，有则用1
 		头信息：固定40bit
-4：行溢出数据
+4：行溢出数据：因为一个数据页16k及16384字节，一行记录最长为65532字节，其他字节存放在页类型为Uncompress BLOB页中。
+5：InnoDB数据页结构
+	1)File Header(文件头) 38个字节
+		关键属性：FIL_PAGE_OFFSET:表空间中页的偏移量。FIL_PAGE_LSN:修改该页最后被修改的LSN
+	2)Page Header(页头) 56个字节，都是关于记录的配置
+		关键属性：PAGE_HEAP_TOP:记录第一个记录的指针。
+				  PAGE_N_HEAP:堆中的记录数
+				  PAGE_GARBAGE:已删除的记录的字节数，delete flag为1记录的总字节数
+				  PAGE_N_DIRECTION:一个方向连续插入记录的数量
+				  PAGE_N_RECS:该页中记录的数量
+	3)Infimun和Supremum Records 前者记录该页中笔任何主键值要小的值，后者记录比任何可能大的值还要大的值。
+	4)User Records(用户记录及行记录)：行记录的内容
+	5)Free Space(空闲空间)：空闲的行的内容
+	6)Page Directory(页目录)：
+	7)File Trailer(文件结尾信息)：用来保证数据的完整行
+6：分区
+	mysql支持的分区：分区列必须是唯一索引的一个组成部分，如果没有唯一索引那么任何列都可以分区
+	RANGE分区：行数据基于属于一个给定连续区间的列值被放入分区
+		partition p0 values less than (10)
+		partition p1 values less than (20)这样就是连续的分块的分区
+	List分区：和RANGE分区类似，只是LIST分区面向的是离散的值
+		partition p0 values in(1,3,5,7,9)
+		partition p0 values in(2,4,6,8,10)离散的非连续的
+	HASH分区：根据用户定义的表达式的返回值来进行分区，返回值不能是负数
+		partition by hash(year(b))
+		partitions 4;为了均匀分布到各个分区
+	KEY分区：根据MySQL数据库提供的哈希函数来进行分区。
+		partition by key(b)
+		partitions 4;为了均匀分布到各个分区
+7:索引和算法
+	B+树索引
+		聚集索引：是按照表的主键构建的一个B+树，同时叶子节点中存放的即为整张表的行记录数据，也将聚集索引的叶子节点称为数据页。数据页也是索引的一部分，数据页是通过双向链表来进行链接的。
+		每张表只有一个聚集索引。查询优化器倾向于采用聚集索引。
+		辅助索引（非聚集索引）：叶子节点并不包含记录的全部数据，叶子节点包含键值和书签，书签会告诉InnDB存储引擎哪里可以找到与索引相对应的行数据。
+	全文索引
+	哈希索引
+
 	
 		
 	
