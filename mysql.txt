@@ -180,7 +180,37 @@ binlog_format:statement,row,mixed
 		辅助索引（非聚集索引）：叶子节点并不包含记录的全部数据，叶子节点包含键值和书签，书签会告诉InnDB存储引擎哪里可以找到与索引相对应的行数据。
 		B+树索引的分裂：目前默认的是50%分裂页的操作，但是如果遇到顺序递增的索引，那么原有页的使用量只有50%，容易造成浪费
 		通过记录上一次插入记录的位置和方向决定是否从50%处分裂，并带着上一次记录一起分裂
-	B+树的索引
+	B+树的索引管理
+		1）可以通过alter table 或者 create /drop index.
+		2) 可以通过show index from table查看索引信息
+		table:索引所在表
+		non_unique:非唯一索引
+		key_name:索引的名称
+		seq_in_index；索引在该列的位置
+		column_name:索引列的名称
+		collation:列以什么方式存储在索引中
+		cardinality：非常关键的值，标识索引中唯一值数目的预估值，预估值除以行数 尽量要接近1，如果非常小，则可以考虑删除
+		sub_part:是否是列的部分被索引，如果为100表示只有此列的前100字符被索引，为null则表示全部被索引
+		packed:关键字被压缩，为null则未被压缩
+		null:是否允许为null值，值为yes则允许为null
+		index_type:索引的类型只支持B树，则值为null
+		comment：注释
+	索引的使用：
+		1）联合索引最左原则2）select * from buy_log where userid = 1 order by by_date desc 可以创建联合索引userid和by_date
+		2)覆盖索引，如果查询条件中和查询结果语句不需要聚集索引的话，可能会走覆盖索引，比如：
+			1.select count(*) from buy_log，count(*) 和聚集索引的其他数据无关，可以走覆盖索引
+			2.select count(*) from buy_log where buy_date>='xx' and buy_date <= 'xx' 可以走覆盖索引
+	索引提示
+		可以强制指定使用哪个索引：1）mysql错误的使用了索引，非常非常少见2）明确使用哪种索引，减少分析时间
+	Multi-Range Read (MMR)优化：
+	MMR优化以下几种好处：
+	1）MRR是数据库方位较为顺序，在查询辅助索引，根据得到的值按照主键排序，按照主键进行查找
+	2）减少缓冲池中页被替换的次数
+	3）批量处理对键值的查询操作
+	Index Condition Pushdown (ICP)优化
+	mysql在取出索引的同时，判断是否可以进行WHERE条件的过滤，也就是将WHERE的部分过滤操作放在了存储引擎层。在某些查询下，可以大大减少上层sql的查询
+	可以在查询计划中看到Using index condition提示
+	
 		
 	全文索引
 	哈希索引
