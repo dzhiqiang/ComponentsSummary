@@ -210,9 +210,12 @@ binlog_format:statement,row,mixed
 	Index Condition Pushdown (ICP)优化
 	mysql在取出索引的同时，判断是否可以进行WHERE条件的过滤，也就是将WHERE的部分过滤操作放在了存储引擎层。在某些查询下，可以大大减少上层sql的查询
 	可以在查询计划中看到Using index condition提示
-	
-		
-	全文索引
+	全文索引：是将存储于数据库中的整本书活整篇文章中的任意内容信息查找出来的技术。它可以根据需要获得全文中的章，节，段，句等信息也可以进行各种统计和分析。
+	全文索引通常使用倒排索引实现，倒排索引会在辅助表中存储单词与单词自身在一个或者多个文档所在位置的映射。innodb使用的是以下2中方式中第二种方式。
+	1）inverted file index 存储的内容为{单词，单词所在文档}比如 code,{1,4},则说明code字符串在文档1，4中
+	2）full inverted index 存储的内容为{单词，（单词所在文档，文档的位置）}比如code,{(1,10),(4,5)}：则说明code字符串在文档1中10的位置，在文档4中5的位置。
+	innodb全文索引：使用full inverted index的方式，（documntId，position）存放在ilist中，就如上面的例子{（1,10），（4，5）}
+	把work存在在一个表中，叫Auxiliary Table（辅助表）
 	哈希索引
 
 	
