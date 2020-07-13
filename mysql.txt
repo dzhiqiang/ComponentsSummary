@@ -62,6 +62,18 @@ Innodb存储引擎，通过提交必须记录日志（Force Log at Commit）机�
 0：表示事务提交是不进行写入重做日志 文件，通过master thread 中完成，而master thread 是1秒刷新一次
 1：事务提交时就进行一次fsycn
 2: 表示会谢日重做日期文件中，但是仅仅是写入文件系统的缓存中，并不用进行fsync操作
+重做日期都是以512字节存储的，头12字节，尾8字节，数据492字节。磁盘每次提交必须是512字节，所以不用doublewrite
+
+LSN:含义有：1）重做日志写入的总量2）checkpoint的位置3）页的版本。LSN表示事务写入重做日志的总量，单位是字节。
+LSN会存在每个页中，如果页中的LSN小于重做日志的LSN，则此页需要恢复。
+恢复：
+可以使用redolog日志进行恢复，因为存储的是逻辑日志，所以恢复速度比较快。
+会查看数据checkpoint的LSN,恢复当时的LSN大小到redolog的LSN大小
+
+undolog
+redolog日志记录了事务的行为，可以很好的通过对页进行重做，但是事务如果需要回滚，则需要undo.1)遇到事务失败了2）或者直接回滚操作
+redo存放在redolog文件中，而undolo存放在数据库内部的一个特殊段（segment）中,这个段是undo段。
+作用：1）可以利用undolog回滚到修改之前的样子2）可以实现非锁定读
 
 
 InnoDB和myisam的区别
